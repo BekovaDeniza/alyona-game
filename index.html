@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Catch the Sweets</title>
+  <style>
+    body {
+      margin: 0;
+      background: #fff8f0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: sans-serif;
+    }
+    canvas {
+      border: 4px solid #814c35;
+      background: #ffeedd;
+      display: none;
+    }
+    #startScreen, #endScreen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 248, 240, 0.95);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      font-size: 28px;
+      padding: 20px;
+      z-index: 10;
+    }
+    #endScreen {
+      display: none;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+    }
+    .controls {
+      position: absolute;
+      bottom: 20px;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      z-index: 5;
+      display: none;
+    }
+    .controls button, .screen-button {
+      width: 120px;
+      height: 60px;
+      font-size: 20px;
+      border: none;
+      border-radius: 12px;
+      background-color: #ffbaba;
+      color: #5a2e2e;
+      cursor: pointer;
+    }
+    .screen-button:hover {
+      background-color: #ffdada;
+    }
+  </style>
+</head>
+<body>
+  <div id="startScreen">
+    <div>Привет, поможешь Алёне собрать сладости?💕</div>
+    <button class="screen-button" id="startButton">Играть</button>
+  </div>
+
+  <canvas id="gameCanvas" width="480" height="640"></canvas>
+
+  <div id="endScreen">
+    <div id="endMessage"></div>
+    <button class="screen-button" id="restartButton">Сыграть снова</button>
+  </div>
+
+  <div class="controls" id="controls">
+    <button id="leftButton">⬅️</button>
+    <button id="rightButton">➡️</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const keys = {};
+
+    const startScreen = document.getElementById('startScreen');
+    const endScreen = document.getElementById('endScreen');
+    const endMessage = document.getElementById('endMessage');
+    const controls = document.getElementById('controls');
+
+    const catchSound = new Audio('assets/catch.mp3');
+
+    const playerImages = {
+      normal: new Image(),
+      left: new Image(),
+      right: new Image(),
+      win: new Image(),
+      lose: new Image(),
+      catch: new Image()
+    };
+
+    playerImages.normal.src = 'assets/player.png';
+    playerImages.left.src = 'assets/left_player.png';
+    playerImages.right.src = 'assets/right_player.png';
+    playerImages.win.src = 'assets/win_player.png';
+    playerImages.lose.src = 'assets/lose_player.png';
+    playerImages.catch.src = 'assets/catch_player.png';
+
+    const heartImage = new Image();
+    heartImage.src = 'assets/heart.png';
+
+    const candySources = ['assets/candy1.png', 'assets/candy2.png', 'assets/candy3.png', 'assets/candy4.png'];
+
+    const player = {
+      x: 200,
+      y: 560,
+      width: 48,
+      height: 64,
+      speed: 5,
+      currentImage: playerImages.normal
+    };
+
+    const candies = [];
+    let score = 0;
+    let missed = 0;
+    const maxScore = 10;
+    const maxMissed = 5;
+    let gameEnded = false;
+
+    document.addEventListener('keydown', e => keys[e.key] = true);
+    document.addEventListener('keyup', e => keys[e.key] = false);
+
+    document.getElementById('leftButton').addEventListener('mousedown', () => keys['ArrowLeft'] = true);
+    document.getElementById('leftButton').addEventListener('mouseup', () => keys['ArrowLeft'] = false);
+    document.getElementById('rightButton').addEventListener('mousedown', () => keys['ArrowRight'] = true);
+    document.getElementById('rightButton').addEventListener('mouseup', () => keys['ArrowRight'] = false);
+
+    document.getElementById('leftButton').addEventListener('touchstart', () => keys['ArrowLeft'] = true);
+    document.getElementById('leftButton').addEventListener('touchend', () => keys['ArrowLeft'] = false);
+    document.getElementById('rightButton').addEventListener('touchstart', () => keys['ArrowRight'] = true);
+    document.getElementById('rightButton').addEventListener('touchend', () => keys['ArrowRight'] = false);
+
+    let touchStartX = null;
+    canvas.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+    });
+    canvas.addEventListener('touchend', (e) => {
+      if (touchStartX === null) return;
+      const deltaX = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(deltaX) > 30) {
+        if (deltaX > 0) {
+          keys['ArrowRight'] = true;
+          setTimeout(() => keys['ArrowRight'] = false, 200);
+        } else {
+          keys['ArrowLeft'] = true;
+          setTimeout(() => keys['ArrowLeft'] = false, 200);
+        }
+      }
+      touchStartX = null;
+    });
+
+    function spawnCandy() {
+      if (gameEnded) return;
+      const img = new Image();
+      img.src = candySources[Math.floor(Math.random() * candySources.length)];
+      candies.push({
+        x: Math.random() * (canvas.width - 32),
+        y: -32,
+        width: 32,
+        height: 32,
+        speed: 2 + Math.random() * 3,
+        img: img
+      });
+    }
+
+    function update() {
+      if (keys['ArrowLeft']) {
+        player.x -= player.speed;
+        player.currentImage = playerImages.left;
+      } else if (keys['ArrowRight']) {
+        player.x += player.speed;
+        player.currentImage = playerImages.right;
+      } else {
+        player.currentImage = playerImages.normal;
+      }
+      player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+
+      for (let i = candies.length - 1; i >= 0; i--) {
+        candies[i].y += candies[i].speed;
+        if (
+          candies[i].x < player.x + player.width &&
+          candies[i].x + candies[i].width > player.x &&
+          candies[i].y < player.y + player.height &&
+          candies[i].y + candies[i].height > player.y
+        ) {
+          player.currentImage = playerImages.catch;
+          catchSound.currentTime = 0;
+          catchSound.play().catch(e => console.warn("Ошибка звука:", e));
+          candies.splice(i, 1);
+          score++;
+          if (score >= maxScore) {
+            endGame(true);
+          }
+        } else if (candies[i].y > canvas.height) {
+          candies.splice(i, 1);
+          missed++;
+          if (missed > maxMissed) {
+            endGame(false);
+          }
+        }
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(player.currentImage, player.x, player.y, player.width, player.height);
+      for (const candy of candies) {
+        ctx.drawImage(candy.img, candy.x, candy.y, candy.width, candy.height);
+      }
+      ctx.fillStyle = '#814c35';
+      ctx.font = '20px Arial';
+      ctx.fillText(`Score: ${score}`, 10, 30);
+
+      for (let i = 0; i < maxMissed - missed; i++) {
+        ctx.drawImage(heartImage, 400 - i * 32, 10, 24, 24);
+      }
+    }
+
+    function gameLoop() {
+      if (!gameEnded) {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    function endGame(won) {
+        gameEnded = true;
+
+        // Назначение финального изображения
+        player.currentImage = won ? playerImages.win : playerImages.lose;
+
+        // Отображаем финальный фрейм со спрайтом
+        draw();
+
+        // Показываем финальный экран
+        setTimeout(() => {
+            canvas.style.display = 'none';
+            controls.style.display = 'none';
+            endScreen.style.display = 'flex';
+
+            endMessage.innerHTML = won
+            ? 'Ура, Алёна собрала все сладости! 🍭✨'
+            : 'Ой-ой! Сладости упали... 💔🍬';
+        }, 500);
+    }
+
+    function startGame() {
+      startScreen.style.display = 'none';
+      endScreen.style.display = 'none';
+      canvas.style.display = 'block';
+      controls.style.display = 'flex';
+
+      // Reset state
+      score = 0;
+      missed = 0;
+      candies.length = 0;
+      player.x = 200;
+      gameEnded = false;
+      player.currentImage = playerImages.normal;
+
+      setInterval(spawnCandy, 1500);
+      gameLoop();
+    }
+
+    document.getElementById('startButton').addEventListener('click', startGame);
+    document.getElementById('restartButton').addEventListener('click', () => location.reload());
+
+  </script>
+</body>
+</html>
