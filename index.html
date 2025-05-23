@@ -2,66 +2,82 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Catch the Sweets</title>
   <style>
-    body {
-      margin: 0;
-      background: #fff8f0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      font-family: sans-serif;
-    }
-    canvas {
-      border: 4px solid #814c35;
-      background: #ffeedd;
-      display: none;
-    }
-    #startScreen, #endScreen {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(255, 248, 240, 0.95);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      font-size: 28px;
-      padding: 20px;
-      z-index: 10;
-    }
-    #endScreen {
-      display: none;
-      background: rgba(0, 0, 0, 0.6);
-      color: white;
-    }
-    .controls {
-      position: absolute;
-      bottom: 20px;
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      gap: 40px;
-      z-index: 5;
-      display: none;
-    }
-    .controls button, .screen-button {
-      width: 120px;
-      height: 60px;
-      font-size: 20px;
-      border: none;
-      border-radius: 12px;
-      background-color: #ffbaba;
-      color: #5a2e2e;
-      cursor: pointer;
-    }
-    .screen-button:hover {
-      background-color: #ffdada;
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: #fff8f0;
+        font-family: sans-serif;
+        overflow: hidden;
+        height: 100%;
+        }
+
+        canvas {
+        display: none;
+        border: 4px solid #814c35;
+        background: #ffeedd;
+        }
+
+        #startScreen, #endScreen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 248, 240, 0.95);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        font-size: clamp(16px, 5vw, 28px); /* Адаптивный текст */
+        padding: 20px;
+        z-index: 10;
+        }
+
+        #endScreen {
+        display: none;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        }
+
+        .controls {
+        position: absolute;
+        bottom: 5%;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        gap: 10vw;
+        z-index: 5;
+        display: none;
+        }
+
+        .controls button, .screen-button {
+        width: clamp(80px, 25vw, 140px);
+        height: clamp(40px, 12vw, 70px);
+        font-size: clamp(16px, 4.5vw, 22px);
+        border: none;
+        border-radius: 12px;
+        background-color: #ffbaba;
+        color: #5a2e2e;
+        cursor: pointer;
+        touch-action: manipulation;
+        }
+
+        .screen-button:hover {
+        background-color: #ffdada;
+        }
+
+
+    @media (min-width: 768px) {
+      #startScreen, #endScreen {
+        font-size: 28px;
+      }
+      .controls button, .screen-button {
+        font-size: 20px;
+      }
     }
   </style>
 </head>
@@ -71,7 +87,7 @@
     <button class="screen-button" id="startButton">Играть</button>
   </div>
 
-  <canvas id="gameCanvas" width="480" height="640"></canvas>
+  <canvas id="gameCanvas"></canvas>
 
   <div id="endScreen">
     <div id="endMessage"></div>
@@ -86,7 +102,6 @@
   <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const keys = {};
 
     const startScreen = document.getElementById('startScreen');
     const endScreen = document.getElementById('endScreen');
@@ -116,9 +131,10 @@
 
     const candySources = ['assets/candy1.png', 'assets/candy2.png', 'assets/candy3.png', 'assets/candy4.png'];
 
+    const keys = {};
     const player = {
-      x: 200,
-      y: 560,
+      x: 0,
+      y: 0,
       width: 48,
       height: 64,
       speed: 5,
@@ -131,6 +147,27 @@
     const maxScore = 10;
     const maxMissed = 5;
     let gameEnded = false;
+
+    function resizeCanvas() {
+      const aspectRatio = 3 / 4;
+      let width = window.innerWidth;
+      let height = window.innerHeight;
+
+      if (height > width / aspectRatio) {
+        height = width / aspectRatio;
+      } else {
+        width = height * aspectRatio;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      player.y = canvas.height - player.height - 20;
+      if (!gameEnded) {
+        player.x = canvas.width / 2 - player.width / 2;
+      }
+    }
+
+    window.addEventListener('resize', resizeCanvas);
 
     document.addEventListener('keydown', e => keys[e.key] = true);
     document.addEventListener('keyup', e => keys[e.key] = false);
@@ -188,6 +225,7 @@
       } else {
         player.currentImage = playerImages.normal;
       }
+
       player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
 
       for (let i = candies.length - 1; i >= 0; i--) {
@@ -227,7 +265,7 @@
       ctx.fillText(`Score: ${score}`, 10, 30);
 
       for (let i = 0; i < maxMissed - missed; i++) {
-        ctx.drawImage(heartImage, 400 - i * 32, 10, 24, 24);
+        ctx.drawImage(heartImage, canvas.width - 30 - i * 28, 10, 24, 24);
       }
     }
 
@@ -239,39 +277,32 @@
       }
     }
 
-    
     function endGame(won) {
-        gameEnded = true;
+      gameEnded = true;
+      player.currentImage = won ? playerImages.win : playerImages.lose;
+      draw();
 
-        // Назначение финального изображения
-        player.currentImage = won ? playerImages.win : playerImages.lose;
-
-        // Отображаем финальный фрейм со спрайтом
-        draw();
-
-        // Показываем финальный экран
-        setTimeout(() => {
-            canvas.style.display = 'none';
-            controls.style.display = 'none';
-            endScreen.style.display = 'flex';
-
-            endMessage.innerHTML = won
-            ? 'Ура, Алёна собрала все сладости! 🍭✨'
-            : 'Ой-ой! Сладости упали... 💔🍬';
-        }, 500);
+      setTimeout(() => {
+        canvas.style.display = 'none';
+        controls.style.display = 'none';
+        endScreen.style.display = 'flex';
+        endMessage.innerHTML = won
+          ? 'Ура, Алёна собрала все сладости! 🍭✨'
+          : 'Ой-ой! Сладости упали... 💔🍬';
+      }, 500);
     }
 
     function startGame() {
+      resizeCanvas();
       startScreen.style.display = 'none';
       endScreen.style.display = 'none';
       canvas.style.display = 'block';
       controls.style.display = 'flex';
 
-      // Reset state
       score = 0;
       missed = 0;
       candies.length = 0;
-      player.x = 200;
+      player.x = canvas.width / 2 - player.width / 2;
       gameEnded = false;
       player.currentImage = playerImages.normal;
 
@@ -282,6 +313,7 @@
     document.getElementById('startButton').addEventListener('click', startGame);
     document.getElementById('restartButton').addEventListener('click', () => location.reload());
 
+    resizeCanvas();
   </script>
 </body>
 </html>
